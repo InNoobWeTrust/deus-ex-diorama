@@ -1,0 +1,16 @@
+[package]
+name = "deus-ex-diorama"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "deus_ex_diorama"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "cli"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.5.26", features = ["derive"] }
+llama-cpp-sys-2 = { version = "0.1.87", features = ["dynamic-link"] }
