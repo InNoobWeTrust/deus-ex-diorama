@@ -1,0 +1,6 @@
+[env]
+CARGO_MAKE_EXTEND_WORKSPACE_MAKEFILE = false
+
+[tasks.cli_simple]
+command = "cargo"
+args = ["run", "--", "-m", "lib/llamacpp-sys/llama.cpp/models/ggml-vocab-llama-bpe.gguf", "-p", "You are a good assistant."]

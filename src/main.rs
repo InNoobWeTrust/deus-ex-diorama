@@ -3,7 +3,7 @@ extern crate deus_ex_diorama;
 use clap::Parser;
 use core::error::Error;
 use deus_ex_diorama::*;
-use llama_cpp_sys_2::*;
+use llamacpp_sys::*;
 use std::ffi::CString;
 
 #[derive(Parser, Debug)]

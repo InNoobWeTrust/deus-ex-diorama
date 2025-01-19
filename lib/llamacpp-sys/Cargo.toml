@@ -1,0 +1,18 @@
+[package]
+name = "llamacpp-sys"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+
+[dependencies]
+
+[build-dependencies]
+bindgen = { version = "0.71.1" }
+cmake = "0.1.52"
+globwalk = "0.9.1"
+
+[features]
+cuda = []
+vulkan = []
+sharedlib = []
+
