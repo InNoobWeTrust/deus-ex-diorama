@@ -47,9 +47,9 @@ fn main() {
     conf.profile("Release")
         //.build_target("ggml")
         //.build_target("llama")
-        //.define("CMAKE_CXX_STANDARD", "14")
         //.very_verbose(true)
-        //.define("GGML_OPENMP", "OFF")
+        .define("CMAKE_CXX_STANDARD", "17")
+        .define("CMAKE_CXX_STANDARD_REQUIRED", "ON")
         .define("LLAMA_BUILD_TESTS", "OFF")
         .define("LLAMA_BUILD_EXAMPLES", "OFF")
         .define("LLAMA_BUILD_SERVER", "OFF");
@@ -57,6 +57,7 @@ fn main() {
     // Llama features
     if cfg!(target_os = "macos") {
         conf.define("GGML_BLAS", "OFF");
+        conf.define("GGML_OPENMP", "OFF");
     }
 
     if cfg!(feature = "cuda") {

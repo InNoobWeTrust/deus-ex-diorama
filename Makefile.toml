@@ -1,6 +1,23 @@
 [env]
 CARGO_MAKE_EXTEND_WORKSPACE_MAKEFILE = false
 
+# Uncomment to override default task
+#[tasks.default]
+#clear = true
+#command = "cargo"
+#args = ["build"]
+#dependencies = ["build_dependencies"]
+
+# Default task is build
+[tasks.build]
+args = ["build"]
+dependencies = ["build_dependencies"]
+
+[tasks.build_dependencies]
+command = "git"
+args = ["submodule", "update", "--init", "--recursive"]
+
 [tasks.cli_simple]
 command = "cargo"
 args = ["run", "--", "-m", "lib/llamacpp-sys/llama.cpp/models/ggml-vocab-llama-bpe.gguf", "-p", "You are a good assistant."]
+dependencies = ["build_dependencies"]
