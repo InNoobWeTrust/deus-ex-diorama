@@ -33,7 +33,9 @@ fn get_built_libs() -> Vec<String> {
                 .map(|p| {
                     let stem = p.path().file_stem().unwrap().to_str().unwrap();
                     let lib_name = stem.strip_prefix("lib").unwrap_or(stem);
-                    println!("cargo:warning=[DEBUG] Found lib: {lib_name}");
+                    if cfg!(debug_assertions) {
+                        println!("cargo:warning=[DEBUG] Found lib: {lib_name}");
+                    }
                     lib_name.to_string()
                 })
                 .collect::<Vec<String>>()
@@ -88,10 +90,12 @@ fn main() {
     // Tell cargo where to find the built library
     // Add all possible library search paths
     get_lib_dirs().into_iter().for_each(|sub| {
-        println!(
-            "cargo:warning=[DEBUG] Adding lib dir: {}",
-            sub.to_str().unwrap()
-        );
+        if cfg!(debug_assertions) {
+            println!(
+                "cargo:warning=[DEBUG] Adding lib dir: {}",
+                sub.to_str().unwrap()
+            );
+        }
         println!("cargo:rustc-link-search=native={}", sub.to_str().unwrap());
     });
     // Link the libraries

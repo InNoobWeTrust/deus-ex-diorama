@@ -1,14 +1,10 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+use core::error::Error;
+use std::path::PathBuf;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub async fn hf_load_file(repo: &str, file: &str) -> Result<PathBuf, Box<dyn Error>> {
+    let api = hf_hub::api::tokio::Api::new()?;
+    let repo = api.model(repo.to_string());
+    let file_name = repo.get(file).await?;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+    Ok(file_name)
 }
