@@ -1,6 +1,0 @@
-dependencies:
-  rust-lang.org: ^1
-  cmake: ^3
-  node: ^23
-  huggingface-cli: ^0
-  ccache: ^4

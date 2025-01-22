@@ -15,8 +15,19 @@ Poor dev here, doing this just to understand deeper about the building blocks of
 ## Quick start
 
 ```sh
-cargo install --no-default-features --force cargo-make
+## Install cargo-make using cargo or cargo-binstall
+command -v cargo-make || \
+    (command -v cargo-binstall && \
+     cargo binstall cargo-make || \
+     cargo install --no-default-features --force cargo-make)
+## Or via cargo binstall
+# cargo install --locked cargo-binstall
+# cargo binstall cargo-make
+
+## Invoke cargo subcommand
 cargo make cli_simple
+## Or call makers directly
+# makers cli_simple
 ```
 
 ## TODO
