@@ -1,0 +1,10 @@
+[package]
+name = "cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.5.27", features = ["derive"] }
+color-eyre = "0.6.3"
+crossterm = "0.28.1"
+ratatui = "0.29.0"
