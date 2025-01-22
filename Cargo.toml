@@ -16,6 +16,7 @@ clap = { version = "4.5.26", features = ["derive"] }
 directories = "6.0.0"
 hf-hub = "0.4.1"
 llamacpp-sys = { path = "./lib/llamacpp-sys" }
+genai_api = { path = "./lib/genai_api" }
 reqwest = "0.12.12"
 serde = { version = "1.0.217", features = ["derive"] }
 serde_derive = "1.0.217"

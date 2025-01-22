@@ -1,4 +1,0 @@
-dependencies:
-  rust-lang.org: ^1
-  cmake: ^3
-  ccache: ^4
