@@ -7,3 +7,4 @@ dependencies:
   node: ^23
   huggingface-cli: ^0
   ccache: ^4
+  jupyter: ^4

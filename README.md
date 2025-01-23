@@ -14,7 +14,15 @@ Poor dev here, doing this just to understand deeper about the building blocks of
 
 ## Quick start
 
-```sh
+### Install pkgx to setup development dependencies automatically (recommended)
+
+```sh {"tag": "pkgx"}
+curl -fsS https://pkgx.sh | sh
+```
+
+### Run a sample prompt
+
+```sh {"tag": "make"}
 ## Install cargo-make using cargo or cargo-binstall
 command -v cargo-make || \
     (command -v cargo-binstall && \
@@ -28,6 +36,27 @@ command -v cargo-make || \
 cargo make cli_simple
 ## Or call makers directly
 # makers cli_simple
+```
+
+## Trying out the main rust library with a jupyter notebook
+
+```sh {"tag": "evcxr"}
+## Install evcxr_jupyter
+command -v evcxr_jupyter || (command -v cargo-binstall && cargo binstall evcxr_jupyter || cargo install --locked evcxr_jupyter) && evcxr_jupyter --install
+## Start jupyter lab from current directory
+jupyter lab
+```
+
+Then choose `Rust` kernel to start a new notebook. For tutorials on how to use Rust for data analysis, see: [rust-data-analysis](https://github.com/wiseaidev/rust-data-analysis)
+
+## Lazy?
+
+Make sure you have `pkgx` and `runme` cli on your machine. Then you can run the shell code blocks in this README by reference it with a tag.
+
+For example, to try out the library with jupyter notebook as the guide above, just simply
+
+```sh {"tag": "runme"}
+runme run --filename README.md -t "evcxr" -y
 ```
 
 ## TODO
