@@ -39,7 +39,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
     debug!(name: "args", args = serde_json::to_string(&args)?);
 
-    let _ = test_llama(&args.hf_repo, &args.hf_file, &args.prompt, args.ngl as i32).await?;
+    test_llama(&args.hf_repo, &args.hf_file, &args.prompt, args.ngl).await?;
 
     Ok(())
 }

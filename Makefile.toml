@@ -1,5 +1,5 @@
 [env]
-CARGO_MAKE_EXTEND_WORKSPACE_MAKEFILE = false
+CARGO_MAKE_EXTEND_WORKSPACE_MAKEFILE = true
 
 # Uncomment to override default task
 #[tasks.default]
@@ -16,6 +16,14 @@ dependencies = ["build_dependencies"]
 [tasks.build_dependencies]
 command = "git"
 args = ["submodule", "update", "--init", "--recursive"]
+
+[tasks.lint]
+dependencies = ["build_dependencies","lint_rust"]
+
+[tasks.lint_rust]
+command = "cargo"
+args = ["clippy", "--all-targets", "--all-features", "--", "-D", "warnings"]
+dependencies = ["build_dependencies"]
 
 [tasks.cli_simple]
 env = { "RUST_LOG" = "debug" }

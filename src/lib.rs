@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate tracing;
-
 use core::error::Error;
 use llamacpp_sys::*;
 use std::ffi::CString;
@@ -26,11 +23,11 @@ pub async fn test_llama(
     let hf_model_path = hf_load_file(hf_repo, hf_file).await?;
     debug!(name: "hf_model_path", hf_model_path = hf_model_path.to_str().unwrap());
     let model_path = CString::new(hf_model_path.to_str().unwrap())?;
-    let prompt = CString::new(prompt)?;
+    let _prompt = CString::new(prompt)?;
     unsafe {
         ggml_backend_load_all();
         let mut model_params = llama_model_default_params();
-        model_params.n_gpu_layers = ngl as i32;
+        model_params.n_gpu_layers = ngl;
         let model = llama_load_model_from_file(model_path.as_ptr(), model_params);
         llama_model_free(model);
     }

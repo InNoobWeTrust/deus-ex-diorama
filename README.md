@@ -51,7 +51,7 @@ Then choose `Rust` kernel to start a new notebook. For tutorials on how to use R
 
 ## Lazy?
 
-Make sure you have `pkgx` and `runme` cli on your machine. Then you can run the shell code blocks in this README by reference it with a tag.
+Make sure you have `pkgx` and `runme` cli on your machine. Then you can run the shell code blocks in this README by referencing it with a tag.
 
 For example, to try out the library with jupyter notebook as the guide above, just simply
 
