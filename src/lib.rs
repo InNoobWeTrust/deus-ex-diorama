@@ -1,5 +1,5 @@
 use core::error::Error;
-use llamacpp_sys::*;
+use libllama_sys::*;
 use std::ffi::CString;
 use std::path::PathBuf;
 use tracing::{debug, instrument};

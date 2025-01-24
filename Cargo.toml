@@ -11,8 +11,8 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 clap = { version = "4.5.26", features = ["derive"] }
 directories = "6.0.0"
 hf-hub = "0.4.1"
-llamacpp-sys = { path = "./modules/llamacpp-sys" }
-genai_api = { path = "./modules/genai_api" }
+libllama-sys = { path = "./modules/libllama-sys" }
+genai-api = { path = "./modules/genai-api" }
 reqwest = "0.12.12"
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.137"

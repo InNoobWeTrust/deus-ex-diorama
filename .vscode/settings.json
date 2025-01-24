@@ -1,6 +1,0 @@
-{
-  "emmet.includeLanguages": {
-    "rust": "html"
-  },
-  "cmake.sourceDirectory": "/Volumes/SS850Evo/Developer/InNoobWeTrust/deus-ex-diorama/lib/llamacpp-sys/llama.cpp"
-}
