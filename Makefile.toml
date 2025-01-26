@@ -28,7 +28,7 @@ dependencies = ["build_dependencies"]
 [tasks.cli_simple]
 env = { "RUST_LOG" = "debug" }
 command = "cargo"
-args = ["run", "--bin", "cli", "--", "--hf-repo", "TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF", "--hf-file", "tinyllama-1.1b-chat-v1.0.Q2_K.gguf", "--ngl", "99", "-p", "You are a helpful assistant."]
+args = ["run", "--bin", "cli", "--", "--hf-repo", "ggml-org/gemma-1.1-2b-it-Q8_0-GGUF", "--hf-file", "gemma-1.1-2b-it.Q8_0.gguf", "--ngl", "99", "-p", "You are a helpful assistant."]
 dependencies = ["build_dependencies"]
 
 [tasks.cli_code_suggestion]

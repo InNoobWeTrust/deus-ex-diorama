@@ -19,3 +19,4 @@ serde_json = "1.0.137"
 tokio = { version = "1.43.0", features = ["rt-multi-thread", "macros"] }
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
+humantime = "2.1.0"
