@@ -1,6 +1,6 @@
 use core::error::Error;
 use std::path::PathBuf;
-use tracing::{debug, instrument};
+use tracing::{debug, info, instrument};
 
 #[instrument]
 pub async fn hf_load_file(repo: &str, file: &str) -> Result<PathBuf, Box<dyn Error>> {
@@ -17,7 +17,7 @@ pub mod llama {
     use std::ffi::CString;
     use std::ops::Deref;
     use std::time::Instant;
-    use tracing::{debug, error, instrument};
+    use tracing::{debug, error, info, instrument};
 
     pub const LLAMA_TOKEN_NULL: llama_token = -1;
 
@@ -45,13 +45,30 @@ pub mod llama {
             Ok(Self(model))
         }
 
+        pub fn get_vocab(&self) -> *const llama_vocab {
+            unsafe { llama_model_get_vocab(**self) }
+        }
+
+        /// Get chat template string from model file
+        pub fn get_chat_template(&self) -> Option<String> {
+            let ptr_tmpl;
+            unsafe {
+                ptr_tmpl = llama_model_chat_template(**self);
+            }
+            if ptr_tmpl.is_null() {
+                return None;
+            }
+
+            unsafe { Some(ptr_tmpl.as_ref().unwrap().to_string()) }
+        }
+
         /// Warmup model without actual run
         pub fn warm_up(&self, ctx: &LlamaContext, n_batch: i32) {
-            debug!("warming up model");
+            info!("warming up model");
             let t_start = Instant::now();
             unsafe {
                 let mut tmp: Vec<llama_token> = Vec::new();
-                let vocab = llama_model_get_vocab(**self);
+                let vocab = self.get_vocab();
                 let bos = llama_vocab_bos(vocab);
                 let eos = llama_vocab_eos(vocab);
 
@@ -107,7 +124,8 @@ pub mod llama {
             loop {
                 match rx.recv().await {
                     Some(orig_prompt) => {
-                        let prompt = std::ffi::CString::new(orig_prompt.clone()).expect("cstring from prompt");
+                        let prompt = std::ffi::CString::new(orig_prompt.clone())
+                            .expect("cstring from prompt");
                         // Computation scope
                         let mut n_decode = 0;
                         let t_start = Instant::now();
@@ -120,7 +138,7 @@ pub mod llama {
                         }
                         let elapsed = humantime::format_duration(t_start.elapsed());
                         let speed = n_decode as f64 / t_start.elapsed().as_secs_f64();
-                        debug!("decoded {n_decode} tokens in {elapsed}, speed: {speed} t/s");
+                        info!("decoded {n_decode} tokens in {elapsed}, speed: {speed} TOPS");
                     }
                     _ => break,
                 }
@@ -154,7 +172,7 @@ pub mod llama {
 
     impl LlamaContext {
         #[instrument]
-        pub fn new(
+        pub fn from_model(
             model: &LlamaModel,
             context_params: Option<llama_context_params>,
         ) -> Result<Self, Box<dyn Error>> {
@@ -260,7 +278,7 @@ pub async fn test_llama(
 
     // Load model, create context and sampler
     let model = llama::LlamaModel::new(hf_model_path, None)?;
-    let ctx = llama::LlamaContext::new(&model, None)?;
+    let ctx = llama::LlamaContext::from_model(&model, None)?;
     let smpl = llama::LlamaSampler::new(None)?;
 
     //model.warm_up(&ctx, batch_size);
@@ -289,7 +307,7 @@ pub async fn test_llama(
     tasks.spawn(async move {
         loop {
             match gen_rx.recv().await {
-                Some(data) => debug!(%data),
+                Some(data) => info!(%data, "data read"),
                 _ => break,
             }
         }
