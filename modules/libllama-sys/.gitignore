@@ -1,2 +1,2 @@
-/taget
-/Cargo.lock
+target/
+Cargo.lock

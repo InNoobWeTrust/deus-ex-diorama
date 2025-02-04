@@ -102,12 +102,12 @@ fn main() {
     // Tell cargo to rebuild if these files change
     println!("cargo:rerun-if-changed=llama.cpp");
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=wrapper.h");
+    println!("cargo:rerun-if-changed=wrapper.hpp");
 
     // Generate bindings
     let bindings = bindgen::builder();
     let binding_gens = bindings
-        .header("wrapper.h")
+        .header("wrapper.hpp")
         // Add include path from CMake build
         .clang_arg(format!("-I{}", dst.join("include").display()))
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
@@ -116,12 +116,20 @@ fn main() {
         .allowlist_type("ggml_.*")
         .allowlist_function("llama_.*")
         .allowlist_type("llama_.*")
+        .allowlist_function("libllama_.*")
+        .allowlist_type("libllama_.*")
         .prepend_enum_name(false)
         .generate()
         .expect("Unable to generate bindings");
 
-    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+    // Write to src
+    let src_dir = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap());
+    binding_gens
+        .write_to_file(src_dir.join("src").join("bindings.rs"))
+        .expect("Couldn't write bindings!");
 
+    // Write to out dir
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     binding_gens
         .write_to_file(out_path.join("bindings.rs"))
         .expect("Failed to write bindings");

@@ -21,8 +21,29 @@ pub mod llama {
 
     pub const LLAMA_TOKEN_NULL: llama_token = -1;
 
+    //======================================================= LlamaModel wrapper
+
     #[derive(Debug)]
     pub struct LlamaModel(*mut llama_model);
+
+    impl Deref for LlamaModel {
+        type Target = *mut llama_model;
+
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
+    impl Drop for LlamaModel {
+        fn drop(&mut self) {
+            unsafe {
+                llama_model_free(self.0);
+            }
+        }
+    }
+
+    unsafe impl Sync for LlamaModel {}
+    unsafe impl Send for LlamaModel {}
 
     impl LlamaModel {
         #[instrument]
@@ -148,48 +169,10 @@ pub mod llama {
         }
     }
 
-    impl Deref for LlamaModel {
-        type Target = *mut llama_model;
-
-        fn deref(&self) -> &Self::Target {
-            &self.0
-        }
-    }
-
-    impl Drop for LlamaModel {
-        fn drop(&mut self) {
-            unsafe {
-                llama_model_free(self.0);
-            }
-        }
-    }
-
-    unsafe impl Sync for LlamaModel {}
-    unsafe impl Send for LlamaModel {}
+    //===================================================== LlamaContext wrapper
 
     #[derive(Debug)]
     pub struct LlamaContext(*mut llama_context);
-
-    impl LlamaContext {
-        #[instrument]
-        pub fn from_model(
-            model: &LlamaModel,
-            context_params: Option<llama_context_params>,
-        ) -> Result<Self, Box<dyn Error>> {
-            let ctx: *mut llama_context;
-            let c_params =
-                context_params.unwrap_or_else(|| unsafe { llama_context_default_params() });
-            unsafe {
-                ctx = llama_init_from_model(**model, c_params);
-                if ctx.is_null() {
-                    let err_msg = "failed to create context";
-                    error!(err_msg);
-                    return Err(err_msg.into());
-                }
-            }
-            Ok(Self(ctx))
-        }
-    }
 
     impl Deref for LlamaContext {
         type Target = *mut llama_context;
@@ -210,8 +193,56 @@ pub mod llama {
     unsafe impl Sync for LlamaContext {}
     unsafe impl Send for LlamaContext {}
 
+    impl LlamaContext {
+        #[instrument]
+        pub fn from_model(
+            model: &LlamaModel,
+            context_params: Option<llama_context_params>,
+        ) -> Result<Self, Box<dyn Error>> {
+            let ctx: *mut llama_context;
+            let c_params =
+                context_params.unwrap_or_else(|| unsafe { llama_context_default_params() });
+            unsafe {
+                ctx = llama_init_from_model(**model, c_params);
+                if ctx.is_null() {
+                    let err_msg = "failed to create context";
+                    error!(err_msg);
+                    return Err(err_msg.into());
+                }
+            }
+            Ok(Self(ctx))
+        }
+
+        pub fn attach_cpu_threadpool(&self, tpp: ggml_threadpool_params, tpp_batch: ggml_threadpool_params) {
+            unsafe {
+                libllama_init_attach_cpu_threadpool(**self, tpp, tpp_batch);
+            }
+        }
+    }
+
+    //===================================================== LlamaSampler wrapper
+
     #[derive(Debug)]
     pub struct LlamaSampler(*mut llama_sampler);
+
+    impl Deref for LlamaSampler {
+        type Target = *mut llama_sampler;
+
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
+    impl Drop for LlamaSampler {
+        fn drop(&mut self) {
+            unsafe {
+                llama_sampler_free(self.0);
+            }
+        }
+    }
+
+    unsafe impl Sync for LlamaSampler {}
+    unsafe impl Send for LlamaSampler {}
 
     impl LlamaSampler {
         #[instrument]
@@ -234,24 +265,7 @@ pub mod llama {
         }
     }
 
-    impl Deref for LlamaSampler {
-        type Target = *mut llama_sampler;
-
-        fn deref(&self) -> &Self::Target {
-            &self.0
-        }
-    }
-
-    impl Drop for LlamaSampler {
-        fn drop(&mut self) {
-            unsafe {
-                llama_sampler_free(self.0);
-            }
-        }
-    }
-
-    unsafe impl Sync for LlamaSampler {}
-    unsafe impl Send for LlamaSampler {}
+    //==================================================== Wrap common functions
 
     /// init backend
     pub fn init() {
