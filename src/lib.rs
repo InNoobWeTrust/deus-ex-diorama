@@ -66,8 +66,58 @@ pub mod llama {
             Ok(Self(model))
         }
 
+        /// Get vocab of the model
         pub fn get_vocab(&self) -> *const llama_vocab {
             unsafe { llama_model_get_vocab(**self) }
+        }
+
+        /// Tokenize the text using model's vocab
+        pub fn tokenize(
+            &self,
+            txt: &str,
+            add_special: bool,
+            parse_special: bool,
+        ) -> Result<Vec<llama_token>, Box<dyn Error>> {
+            let upper_limit = txt.len() + 2 * (if add_special { 1 } else { 0 });
+            let txt_cstr = CString::new(txt).expect("cstring from txt");
+            let mut result: Vec<llama_token> = Vec::with_capacity(upper_limit);
+            let n_tokens = unsafe {
+                llama_tokenize(
+                    self.get_vocab(),
+                    txt_cstr.as_ptr(),
+                    txt.len() as i32,
+                    result.as_mut_ptr(),
+                    upper_limit as i32,
+                    add_special,
+                    parse_special,
+                )
+            };
+            if n_tokens < 0 {
+                // Resize vector to fix number of tokens
+                result.clear();
+                result.resize(-n_tokens as usize, llama_token::default());
+                // Tokenize again
+                let check = unsafe {
+                    llama_tokenize(
+                        self.get_vocab(),
+                        txt_cstr.as_ptr(),
+                        txt.len() as i32,
+                        result.as_mut_ptr(),
+                        -n_tokens,
+                        add_special,
+                        parse_special,
+                    )
+                };
+                if check != -n_tokens {
+                    let fmt_n_tokens = -n_tokens;
+                    return Err(format!(
+                        "Failed to tokenize: check ({check}) != n_tokens ({fmt_n_tokens})"
+                    )
+                    .into());
+                }
+            }
+
+            Ok(result)
         }
 
         /// Get chat template string from model file
@@ -141,28 +191,32 @@ pub mod llama {
             smpl: &LlamaSampler,
             rx: &mut tokio::sync::mpsc::Receiver<String>,
             tx: tokio::sync::mpsc::Sender<String>,
+            err_tx: tokio::sync::mpsc::Sender<String>,
         ) -> Result<(), &'static str> {
-            loop {
-                match rx.recv().await {
-                    Some(orig_prompt) => {
-                        let prompt = std::ffi::CString::new(orig_prompt.clone())
-                            .expect("cstring from prompt");
-                        // Computation scope
-                        let mut n_decode = 0;
-                        let t_start = Instant::now();
-                        unsafe {
-                            tx.send("Hello".into()).await;
-                            tx.send(", ".into()).await;
-                            tx.send("bug".into()).await;
-                            tx.send("!".into()).await;
-                            tx.send(orig_prompt.into()).await;
-                        }
-                        let elapsed = humantime::format_duration(t_start.elapsed());
-                        let speed = n_decode as f64 / t_start.elapsed().as_secs_f64();
-                        info!("decoded {n_decode} tokens in {elapsed}, speed: {speed} TOPS");
-                    }
-                    _ => break,
+            while let Some(orig_prompt) = rx.recv().await {
+                let prompt = CString::new(orig_prompt.clone()).expect("cstring from prompt");
+                // Tokenize and check
+                let tokens = self.tokenize(&orig_prompt, true, true);
+                if tokens.is_err() || tokens.unwrap().len() as u32 > ctx.get_nctx() - 4 {
+                    // Failed to tokenize, send error and continue with next prompt
+                    err_tx
+                        .send(format!("Failed to tokenize:\n{orig_prompt}").into())
+                        .await;
+                    continue;
                 }
+                // Computation scope
+                let mut n_decode = 0;
+                let t_start = Instant::now();
+                unsafe {
+                    let _ = tx.send("Hello".into()).await;
+                    let _ = tx.send(", ".into()).await;
+                    let _ = tx.send("bug".into()).await;
+                    let _ = tx.send("!".into()).await;
+                    let _ = tx.send(orig_prompt.into()).await;
+                }
+                let elapsed = humantime::format_duration(t_start.elapsed());
+                let speed = n_decode as f64 / t_start.elapsed().as_secs_f64();
+                info!("decoded {n_decode} tokens in {elapsed}, speed: {speed} TOPS");
             }
 
             Ok(())
@@ -213,10 +267,25 @@ pub mod llama {
             Ok(Self(ctx))
         }
 
-        pub fn attach_cpu_threadpool(&self, tpp: ggml_threadpool_params, tpp_batch: ggml_threadpool_params) {
+        /// Get n_ctx size
+        pub fn get_nctx(&self) -> u32 {
+            unsafe { llama_n_ctx(**self) }
+        }
+
+        pub fn attach_cpu_threadpool(
+            &self,
+            tpp: ggml_threadpool_params,
+            tpp_batch: ggml_threadpool_params,
+        ) -> Result<(), Box<dyn Error>> {
             unsafe {
-                libllama_init_attach_cpu_threadpool(**self, tpp, tpp_batch);
+                let res = libllama_init_attach_cpu_threadpool(**self, tpp, tpp_batch);
+
+                if res != 0 {
+                    return Err("Failed to init and attach cpu threadpool".into());
+                }
             }
+
+            Ok(())
         }
     }
 
@@ -299,9 +368,10 @@ pub async fn test_llama(
 
     let (prompt_tx, mut prompt_rx) = tokio::sync::mpsc::channel::<String>(2);
     let (gen_tx, mut gen_rx) = tokio::sync::mpsc::channel::<String>(2048);
+    let (err_tx, mut err_rx) = tokio::sync::mpsc::channel::<String>(2048);
 
     // Loop
-    let loop_task = model.async_loop(&ctx, &smpl, &mut prompt_rx, gen_tx);
+    let loop_task = model.async_loop(&ctx, &smpl, &mut prompt_rx, gen_tx, err_tx);
 
     // Copy prompt string
     let prompt = prompt.to_owned();
@@ -309,21 +379,24 @@ pub async fn test_llama(
 
     // Writer
     tasks.spawn(async move {
-        prompt_tx.send(prompt.clone()).await;
+        let _ = prompt_tx.send(prompt.clone()).await;
         // Sleep 2 seconds
         tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-        prompt_tx.send(prompt.clone()).await;
+        let _ = prompt_tx.send(prompt.clone()).await;
         // Sleep 2 seconds
         tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-        prompt_tx.send(prompt.clone()).await;
+        let _ = prompt_tx.send(prompt.clone()).await;
     });
     // Reader
     tasks.spawn(async move {
-        loop {
-            match gen_rx.recv().await {
-                Some(data) => info!(%data, "data read"),
-                _ => break,
-            }
+        while let Some(data) = gen_rx.recv().await {
+            info!(%data, "data received");
+        }
+    });
+    // Err Reader
+    tasks.spawn(async move {
+        while let Some(data) = err_rx.recv().await {
+            info!(%data, "error received");
         }
     });
 
