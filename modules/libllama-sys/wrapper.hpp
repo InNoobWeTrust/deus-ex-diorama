@@ -65,37 +65,36 @@ bool set_process_priority(enum ggml_sched_priority prio) {
 
 #endif
 
-int libllama_init_attach_cpu_threadpool(llama_context *ctx,
-                                 struct ggml_threadpool_params tpp,
-                                 struct ggml_threadpool_params tpp_batch) {
-  auto *reg = ggml_backend_dev_backend_reg(
-      ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU));
+struct ggml_threadpool *
+libllama_init_threadpool(enum ggml_backend_dev_type dev_type,
+                         struct ggml_threadpool_params tpp) {
+  auto *reg = ggml_backend_dev_backend_reg(ggml_backend_dev_by_type(dev_type));
   auto *ggml_threadpool_new_fn =
       (decltype(ggml_threadpool_new) *)ggml_backend_reg_get_proc_address(
           reg, "ggml_threadpool_new");
+
+  set_process_priority(tpp.prio);
+
+  struct ggml_threadpool *threadpool = ggml_threadpool_new_fn(&tpp);
+  if (!threadpool) {
+    return nullptr;
+  }
+
+  return threadpool;
+}
+
+int libllama_free_threadpool(enum ggml_backend_dev_type dev_type,
+                             struct ggml_threadpool *threadpool) {
+  auto *reg = ggml_backend_dev_backend_reg(ggml_backend_dev_by_type(dev_type));
   auto *ggml_threadpool_free_fn =
       (decltype(ggml_threadpool_free) *)ggml_backend_reg_get_proc_address(
           reg, "ggml_threadpool_free");
 
-  set_process_priority(tpp.prio);
-
-  struct ggml_threadpool *threadpool_batch = NULL;
-  if (!ggml_threadpool_params_match(&tpp, &tpp_batch)) {
-    threadpool_batch = ggml_threadpool_new_fn(&tpp_batch);
-    if (!threadpool_batch) {
-      return 1;
-    }
-
-    // Start the non-batch threadpool in the paused state
-    tpp.paused = true;
-  }
-
-  struct ggml_threadpool *threadpool = ggml_threadpool_new_fn(&tpp);
-  if (!threadpool) {
+  if (nullptr == threadpool) {
     return 1;
   }
 
-  llama_attach_threadpool(ctx, threadpool, threadpool_batch);
+  ggml_threadpool_free_fn(threadpool);
 
   return 0;
 }

@@ -4677,11 +4677,17 @@ unsafe extern "C" {
     pub fn llama_perf_sampler_reset(chain: *mut llama_sampler);
 }
 unsafe extern "C" {
-    #[link_name = "\u{1}__Z35libllama_init_attach_cpu_threadpoolP13llama_context22ggml_threadpool_paramsS1_"]
-    pub fn libllama_init_attach_cpu_threadpool(
-        ctx: *mut llama_context,
+    #[link_name = "\u{1}__Z24libllama_init_threadpool21ggml_backend_dev_type22ggml_threadpool_params"]
+    pub fn libllama_init_threadpool(
+        dev_type: ggml_backend_dev_type,
         tpp: ggml_threadpool_params,
-        tpp_batch: ggml_threadpool_params,
+    ) -> *mut ggml_threadpool;
+}
+unsafe extern "C" {
+    #[link_name = "\u{1}__Z24libllama_free_threadpool21ggml_backend_dev_typeP15ggml_threadpool"]
+    pub fn libllama_free_threadpool(
+        dev_type: ggml_backend_dev_type,
+        threadpool: *mut ggml_threadpool,
     ) -> ::std::os::raw::c_int;
 }
 #[repr(C)]
