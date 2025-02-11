@@ -1,6 +1,8 @@
 use core::error::Error;
+use std::ffi::CString;
 use std::path::PathBuf;
 use tracing::{debug, info, instrument};
+use tracing_subscriber::fmt::FormatFields;
 
 #[instrument]
 pub async fn hf_load_file(repo: &str, file: &str) -> Result<PathBuf, Box<dyn Error>> {
@@ -38,6 +40,7 @@ pub mod llama {
         fn default() -> Self {
             // init backend
             unsafe {
+                ggml_backend_load_all();
                 llama_backend_init();
                 llama_numa_init(GGML_NUMA_STRATEGY_DISABLED);
             }
@@ -129,15 +132,85 @@ pub mod llama {
             }
             Ok(Self(model))
         }
+    }
 
+    //================================================ LlamaChatMessage wrrapper
+
+    #[derive(Debug, Clone)]
+    pub struct LlamaChatMessage {
+        pub role: CString,
+        pub content: CString,
+    }
+
+    unsafe impl Sync for LlamaChatMessage {}
+    unsafe impl Send for LlamaChatMessage {}
+
+    impl LlamaChatMessage {
+        pub fn raw(&self) -> llama_chat_message {
+            llama_chat_message {
+                role: self.role.as_ptr(),
+                content: self.content.as_ptr(),
+            }
+        }
+    }
+
+    //=============================================== LlamaChatTemplate wrrapper
+
+    #[derive(Debug)]
+    pub struct LlamaChatTemplate(*const std::os::raw::c_char);
+
+    impl Deref for LlamaChatTemplate {
+        type Target = *const std::os::raw::c_char;
+
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
+    unsafe impl Sync for LlamaChatTemplate {}
+    unsafe impl Send for LlamaChatTemplate {}
+
+    impl From<&LlamaModel> for LlamaChatTemplate {
+        fn from(model: &LlamaModel) -> Self {
+            Self(unsafe { llama_model_chat_template(**model) })
+        }
+    }
+
+    impl LlamaChatTemplate {
         /// Get chat template string from model file
         pub fn get_chat_template(&self) -> Option<String> {
-            let ptr_tmpl = unsafe { llama_model_chat_template(**self) };
-            if ptr_tmpl.is_null() {
+            if self.0.is_null() {
                 return None;
             }
 
-            unsafe { Some(ptr_tmpl.as_ref().unwrap().to_string()) }
+            let s = unsafe { std::ffi::CStr::from_ptr(self.0) };
+
+            match s.to_string_lossy() {
+                std::borrow::Cow::Borrowed(s) => Some(s.to_string()),
+                std::borrow::Cow::Owned(s) => Some(s),
+            }
+        }
+
+        /// Apply chat template
+        pub fn apply(&self, messages: &[LlamaChatMessage], n_ctx: u32) -> String {
+            let buf = unsafe { CString::from_vec_unchecked(vec![0; n_ctx as usize]) };
+            let buf_ptr = buf.into_raw();
+            let raw_messages = messages.iter().map(|m| m.raw()).collect::<Vec<_>>();
+            let _ = unsafe {
+                llama_chat_apply_template(
+                    self.0,
+                    raw_messages.as_ptr(),
+                    raw_messages.len(),
+                    false,
+                    buf_ptr,
+                    n_ctx as i32,
+                )
+            };
+            let s = unsafe { CString::from_raw(buf_ptr) };
+            match s.to_string_lossy() {
+                std::borrow::Cow::Borrowed(s) => s.to_string(),
+                std::borrow::Cow::Owned(s) => s,
+            }
         }
     }
 
@@ -220,47 +293,40 @@ pub mod llama {
             add_special: bool,
             parse_special: bool,
         ) -> Result<Vec<llama_token>, String> {
-            let upper_limit = if add_special {
-                txt.len() + 2
-            } else {
-                txt.len()
-            };
             let txt_cstr = CString::new(txt).expect("cstring from txt");
-            let mut result: Vec<llama_token> = vec![0; upper_limit];
+            let mut result: Vec<llama_token> = Vec::new();
             let n_tokens = unsafe {
                 llama_tokenize(
                     **self,
                     txt_cstr.as_ptr(),
                     txt.len() as i32,
-                    result.as_mut_ptr(),
-                    upper_limit as i32,
+                    core::ptr::null_mut(),
+                    0i32,
                     add_special,
                     parse_special,
                 )
             };
 
-            if n_tokens < 0 {
-                // Resize vector to fix number of tokens
-                result.clear();
-                result.resize(-n_tokens as usize, llama_token::default());
-                // Tokenize again
-                let check = unsafe {
-                    llama_tokenize(
-                        **self,
-                        txt_cstr.as_ptr(),
-                        txt.len() as i32,
-                        result.as_mut_ptr(),
-                        -n_tokens,
-                        add_special,
-                        parse_special,
-                    )
-                };
-                if check != -n_tokens {
-                    let fmt_n_tokens = -n_tokens;
-                    return Err(format!(
-                        "Failed to tokenize: check ({check}) != n_tokens ({fmt_n_tokens})"
-                    ));
-                }
+            // Resize vector to fit number of tokens
+            result.clear();
+            result.resize(-n_tokens as usize, llama_token::default());
+            // Tokenize again
+            let check = unsafe {
+                llama_tokenize(
+                    **self,
+                    txt_cstr.as_ptr(),
+                    txt.len() as i32,
+                    result.as_mut_ptr(),
+                    -n_tokens,
+                    add_special,
+                    parse_special,
+                )
+            };
+            if check < 0 {
+                let fmt_n_tokens = -n_tokens;
+                return Err(format!(
+                    "Failed to tokenize: check ({check}) != n_tokens ({fmt_n_tokens})"
+                ));
             }
 
             debug!("Tokenized {n_tokens} tokens: {result:?}");
@@ -394,25 +460,27 @@ pub mod llama {
         #[instrument]
         pub async fn async_loop(
             &self,
+            chat_template: &LlamaChatTemplate,
             vocab: &LlamaVocab,
             smpl: &LlamaSampler,
-            rx: &mut tokio::sync::mpsc::Receiver<String>,
-            tx: tokio::sync::mpsc::Sender<String>,
-            err_tx: tokio::sync::mpsc::Sender<String>,
+            rx: &mut tokio::sync::mpsc::Receiver<Vec<LlamaChatMessage>>,
+            tx: tokio::sync::mpsc::Sender<Result<String, String>>,
         ) {
-            while let Some(prompt) = rx.recv().await {
+            while let Some(messages) = rx.recv().await {
+                let prompt = chat_template.apply(&messages, self.get_nctx());
+                info!(%prompt);
                 // Tokenize and check
                 let tokens = vocab.tokenize(&prompt, true, true);
                 if tokens.is_err() {
                     // Failed to tokenize, send error and continue with next prompt
-                    let _ = err_tx.send(format!("Failed to tokenize:\n{prompt}")).await;
+                    let _ = tx.send(Err(format!("Failed to tokenize:\n{prompt}"))).await;
                     continue;
                 }
                 let mut tokens = tokens.unwrap();
                 if tokens.len() as u32 > self.get_nctx() - 4 {
                     // Failed to tokenize, send error and continue with next prompt
-                    let _ = err_tx
-                        .send(format!("Tokenize exceed context:\n{prompt}"))
+                    let _ = tx
+                        .send(Err(format!("Tokenize exceed context:\n{prompt}")))
                         .await;
                     continue;
                 }
@@ -426,42 +494,39 @@ pub mod llama {
                     unsafe { llama_batch_get_one(tokens.as_mut_ptr(), tokens.len() as i32) };
                 let mut new_token = llama_token::default();
                 let t_start = Instant::now();
-                while !vocab.is_eog(new_token) {
+                loop {
                     let decode_result = unsafe { llama_decode(**self, batch) };
                     if decode_result != 0 {
                         let err_msg = format!("Failed to decode batch for:\n{prompt}");
                         error!(err_msg);
-                        let _ = err_tx.send(err_msg).await;
+                        let _ = tx.send(Err(err_msg)).await;
                         break;
                     }
 
                     // sample next token
                     new_token = unsafe { llama_sampler_sample(**smpl, **self, -1) };
+                    if vocab.is_eog(new_token) {
+                        break;
+                    }
 
-                    let mut buf = vec![0i8; 128];
+                    let buf = unsafe { CString::from_vec_unchecked(vec![0u8; 256]) };
+                    let buf_ptr = buf.into_raw();
                     let n = unsafe {
-                        llama_token_to_piece(**vocab, new_token, buf.as_mut_ptr(), 127, 0, true)
+                        llama_token_to_piece(**vocab, new_token, buf_ptr, 256i32, 0, true)
                     };
                     if n < 0 {
                         let err_msg = format!("Failed to convert token to piece for:\n{prompt}");
                         error!(err_msg);
-                        let _ = err_tx.send(err_msg).await;
+                        let _ = tx.send(Err(err_msg)).await;
                         break;
                     }
-                    buf.resize(n as usize, 0);
 
-                    match String::from_utf8(buf.iter().map(|&c| c as u8).collect()) {
-                        Ok(s) => {
-                            let _ = tx.send(s).await;
-                        }
-                        Err(e) => {
-                            let err_msg =
-                                format!("Failed to convert piece to string:\n{e:?}");
-                            //error!(err_msg);
-                            let _ = err_tx.send(err_msg).await;
-                            //break;
-                        }
-                    }
+                    let s = unsafe { CString::from_raw(buf_ptr) };
+                    let s = match s.to_string_lossy() {
+                        std::borrow::Cow::Borrowed(s) => s.to_string(),
+                        std::borrow::Cow::Owned(s) => s,
+                    };
+                    let _ = tx.send(Ok(s)).await;
 
                     // Prepare new batch with the sampled token
                     batch = unsafe { llama_batch_get_one(vec![new_token].as_mut_ptr(), 1) };
@@ -514,6 +579,7 @@ pub mod llama {
         #[instrument]
         pub fn new(
             sampler_params: Option<llama_sampler_chain_params>,
+            temperature: Option<f32>,
         ) -> Result<Self, Box<dyn Error>> {
             let s_params =
                 sampler_params.unwrap_or_else(|| unsafe { llama_sampler_chain_default_params() });
@@ -523,7 +589,13 @@ pub mod llama {
                 error!(err_msg);
                 return Err(err_msg.into());
             }
-            unsafe { llama_sampler_chain_add(smpl, llama_sampler_init_greedy()) };
+
+            let temperature = temperature.unwrap_or(0.8);
+
+            unsafe { llama_sampler_chain_add(smpl, llama_sampler_init_min_p(0.05, 1)) };
+            unsafe { llama_sampler_chain_add(smpl, llama_sampler_init_temp(temperature)) };
+            unsafe { llama_sampler_chain_add(smpl, llama_sampler_init_dist(u32::MAX)) };
+
             Ok(Self(smpl))
         }
 
@@ -551,11 +623,14 @@ pub async fn test_llama(
     let vocab = llama::LlamaVocab::from(&model);
     // Create context and sampler for single run
     let ctx = llama::LlamaContext::from_model(&model, None)?;
-    let smpl = llama::LlamaSampler::new(None)?;
+    let smpl = llama::LlamaSampler::new(None, None)?;
+    // Chat template to apply to messages
+    let chat_template = llama::LlamaChatTemplate::from(&model);
+    let template_str = chat_template.get_chat_template().unwrap();
+    info!(chat_template = %template_str);
 
-    let (prompt_tx, mut prompt_rx) = tokio::sync::mpsc::channel::<String>(2);
-    let (gen_tx, mut gen_rx) = tokio::sync::mpsc::channel::<String>(2048);
-    let (err_tx, mut err_rx) = tokio::sync::mpsc::channel::<String>(2048);
+    let (prompt_tx, mut prompt_rx) = tokio::sync::mpsc::channel::<Vec<llama::LlamaChatMessage>>(2);
+    let (gen_tx, mut gen_rx) = tokio::sync::mpsc::channel::<Result<String, String>>(2048);
 
     // Copy prompt string
     let prompt = prompt.to_owned();
@@ -567,33 +642,29 @@ pub async fn test_llama(
     // Loop
     tasks.spawn(async move {
         let _ = ctx
-            .async_loop(&vocab, &smpl, &mut prompt_rx, gen_tx, err_tx)
+            .async_loop(&chat_template, &vocab, &smpl, &mut prompt_rx, gen_tx)
             .await;
     });
-    // Writer
+    // Client
     tasks.spawn(async move {
-        let _ = prompt_tx.send(prompt.clone()).await;
+        let mut messages: Vec<llama::LlamaChatMessage> = Vec::new();
+        messages.push(llama::LlamaChatMessage {
+            role: CString::new("system").unwrap(),
+            content: CString::new("You are a helpful assistant.").unwrap(),
+        });
+        messages.push(llama::LlamaChatMessage {
+            role: CString::new("user").unwrap(),
+            content: CString::new(prompt.clone()).unwrap(),
+        });
+        let _ = prompt_tx.send(messages.clone()).await;
+        let res = gen_rx.recv().await.unwrap().unwrap();
+        info!(%res);
+        messages.push(llama::LlamaChatMessage {
+            role: CString::new("assistant").unwrap(),
+            content: CString::new(res).unwrap(),
+        });
         // Sleep 2 seconds
-        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-        let _ = prompt_tx.send(prompt.clone()).await;
-        // Sleep 2 seconds
-        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-        let _ = prompt_tx.send(prompt.clone()).await;
-    });
-    // Reader
-    tasks.spawn(async move {
-        let mut s = "".to_string();
-        while let Some(data) = gen_rx.recv().await {
-            //debug!(%data, "data received");
-            s += &data;
-        }
-        info!("Generated:\n{s}");
-    });
-    // Err Reader
-    tasks.spawn(async move {
-        while let Some(data) = err_rx.recv().await {
-            debug!(%data, "error received");
-        }
+        //tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
     });
 
     // Wait for tasks

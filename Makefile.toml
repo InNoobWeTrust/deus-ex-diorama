@@ -28,23 +28,23 @@ dependencies = ["build_dependencies"]
 [tasks.cli_simple]
 env = { "RUST_LOG" = "info" }
 command = "cargo"
-args = ["run", "--bin", "cli", "--", "--hf-repo", "ggml-org/gemma-1.1-2b-it-Q8_0-GGUF", "--hf-file", "gemma-1.1-2b-it.Q8_0.gguf", "--ngl", "99", "-p", "<start_of_turn>user\nYou are a helpful assistant<end_of_turn><start_of_turn>model\n"]
+args = ["run", "--bin", "cli", "--", "--hf-repo", "ggml-org/gemma-1.1-2b-it-Q8_0-GGUF", "--hf-file", "gemma-1.1-2b-it.Q8_0.gguf", "--ngl", "99", "-p", "Tell me something I don't know"]
 dependencies = ["build_dependencies"]
 
 [tasks.cli_deepseek]
 env = { "RUST_LOG" = "info" }
 command = "cargo"
-args = ["run", "--bin", "cli", "--", "--hf-repo", "ggml-org/DeepSeek-R1-Distill-Qwen-1.5B-Q4_0-GGUF", "--hf-file", "deepseek-r1-distill-qwen-1.5b-q4_0.gguf", "--ngl", "99", "-p", "You are a helpful assistant."]
+args = ["run", "--bin", "cli", "--", "--hf-repo", "ggml-org/DeepSeek-R1-Distill-Qwen-1.5B-Q4_0-GGUF", "--hf-file", "deepseek-r1-distill-qwen-1.5b-q4_0.gguf", "--ngl", "99", "-p", "Tell me something I don't know"]
 dependencies = ["build_dependencies"]
 
 [tasks.cli_tinyllama]
 env = { "RUST_LOG" = "info" }
 command = "cargo"
-args = ["run", "--bin", "cli", "--", "--hf-repo", "TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF", "--hf-file", "tinyllama-1.1b-chat-v1.0.Q2_K.gguf", "--ngl", "99", "-p", "<|system|>\nYou are a helpful assistant</s><|user|>\nTell me what you can do</s><|assistant|>\n"]
+args = ["run", "--bin", "cli", "--", "--hf-repo", "TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF", "--hf-file", "tinyllama-1.1b-chat-v1.0.Q2_K.gguf", "--ngl", "99", "-p", "Tell me something I don't know"]
 dependencies = ["build_dependencies"]
 
 [tasks.cli_code_suggestion]
 env = { "RUST_LOG" = "info" }
 command = "cargo"
-args = ["run", "--bin", "cli", "--", "--hf-repo", "ggml-org/Qwen2.5-Coder-0.5B-Q8_0-GGUF", "--hf-file", "qwen2.5-coder-0.5b-q8_0.gguf", "--ngl", "99", "-p", "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\nHello<|im_end|>\nassistant\n"]
+args = ["run", "--bin", "cli", "--", "--hf-repo", "ggml-org/Qwen2.5-Coder-0.5B-Q8_0-GGUF", "--hf-file", "qwen2.5-coder-0.5b-q8_0.gguf", "--ngl", "99", "-p", "Tell me something I don't know"]
 dependencies = ["build_dependencies"]
