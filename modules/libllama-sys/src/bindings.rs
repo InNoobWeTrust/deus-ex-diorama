@@ -3909,7 +3909,10 @@ unsafe extern "C" {
     pub fn llama_model_size(model: *const llama_model) -> u64;
 }
 unsafe extern "C" {
-    pub fn llama_model_chat_template(model: *const llama_model) -> *const ::std::os::raw::c_char;
+    pub fn llama_model_chat_template(
+        model: *const llama_model,
+        name: *const ::std::os::raw::c_char,
+    ) -> *const ::std::os::raw::c_char;
 }
 unsafe extern "C" {
     pub fn llama_model_n_params(model: *const llama_model) -> u64;
@@ -4443,7 +4446,7 @@ const _: () = {
 #[repr(C)]
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct llama_sampler {
-    pub iface: *mut llama_sampler_i,
+    pub iface: *const llama_sampler_i,
     pub ctx: llama_sampler_context_t,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
@@ -4454,6 +4457,12 @@ const _: () = {
         [::std::mem::offset_of!(llama_sampler, iface) - 0usize];
     ["Offset of field: llama_sampler::ctx"][::std::mem::offset_of!(llama_sampler, ctx) - 8usize];
 };
+unsafe extern "C" {
+    pub fn llama_sampler_init(
+        iface: *const llama_sampler_i,
+        ctx: llama_sampler_context_t,
+    ) -> *mut llama_sampler;
+}
 unsafe extern "C" {
     pub fn llama_sampler_name(smpl: *const llama_sampler) -> *const ::std::os::raw::c_char;
 }
@@ -4526,6 +4535,10 @@ unsafe extern "C" {
         -> *mut llama_sampler;
 }
 unsafe extern "C" {
+    #[doc = " @details Top n sigma sampling as described in academic paper \"Top-nσ: Not All Logits Are You Need\" https://arxiv.org/pdf/2411.07641"]
+    pub fn llama_sampler_init_top_n_sigma(n: f32) -> *mut llama_sampler;
+}
+unsafe extern "C" {
     #[doc = " @details Mirostat 1.0 algorithm described in the paper https://arxiv.org/abs/2007.14966. Uses tokens instead of words.\n @param candidates A vector of `llama_token_data` containing the candidate tokens, their probabilities (p), and log-odds (logit) for the current position in the generated text.\n @param tau  The target cross-entropy (or surprise) value you want to achieve for the generated text. A higher value corresponds to more surprising or less predictable text, while a lower value corresponds to less surprising or more predictable text.\n @param eta The learning rate used to update `mu` based on the error between the target and observed surprisal of the sampled word. A larger learning rate will cause `mu` to be updated more quickly, while a smaller learning rate will result in slower updates.\n @param m The number of tokens considered in the estimation of `s_hat`. This is an arbitrary value that is used to calculate `s_hat`, which in turn helps to calculate the value of `k`. In the paper, they use `m = 100`, but you can experiment with different values to see how it affects the performance of the algorithm.\n @param mu Maximum cross-entropy. This value is initialized to be twice the target cross-entropy (`2 * tau`) and is updated in the algorithm based on the error between the target and observed surprisal."]
     pub fn llama_sampler_init_mirostat(
         n_vocab: i32,
@@ -4544,6 +4557,18 @@ unsafe extern "C" {
         vocab: *const llama_vocab,
         grammar_str: *const ::std::os::raw::c_char,
         grammar_root: *const ::std::os::raw::c_char,
+    ) -> *mut llama_sampler;
+}
+unsafe extern "C" {
+    #[doc = " @details Lazy grammar sampler, introduced in https://github.com/ggerganov/llama.cpp/pull/9639\n @param trigger_words A list of words that will trigger the grammar sampler. This may be updated to a loose regex syntax (w/ ^) in a near future.\n @param trigger_tokens A list of tokens that will trigger the grammar sampler."]
+    pub fn llama_sampler_init_grammar_lazy(
+        vocab: *const llama_vocab,
+        grammar_str: *const ::std::os::raw::c_char,
+        grammar_root: *const ::std::os::raw::c_char,
+        trigger_words: *mut *const ::std::os::raw::c_char,
+        num_trigger_words: usize,
+        trigger_tokens: *const llama_token,
+        num_trigger_tokens: usize,
     ) -> *mut llama_sampler;
 }
 unsafe extern "C" {
