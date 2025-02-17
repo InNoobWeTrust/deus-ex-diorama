@@ -1,7 +1,7 @@
 dependencies:
   neovim.io: ^0.10
   hx: ^25
-  zellij: ^0.40
+  #zellij: ^0.40
   rust-lang.org: ~1.84
   cmake: ^3
   node: ^23

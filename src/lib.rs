@@ -20,7 +20,11 @@ pub mod llama {
     use std::time::Instant;
     use tracing::{error, info, warn};
 
+    //================================================== Redefine some defaults
+
     pub const LLAMA_TOKEN_NULL: llama_token = -1;
+
+    unsafe extern "C" fn nolog_callback(_level: ggml_log_level, _text: *const ::std::os::raw::c_char, _user_data: *mut ::std::os::raw::c_void) {}
 
     //================================================ Alias for generated chunk
 
@@ -110,6 +114,7 @@ pub mod llama {
                 ggml_backend_load_all();
                 llama_backend_init();
                 llama_numa_init(GGML_NUMA_STRATEGY_DISABLED);
+                llama_log_set(Some(nolog_callback), std::ptr::null_mut());
             }
 
             Self {}
@@ -245,7 +250,6 @@ pub mod llama {
                 // Computation scope
                 let mut batch =
                     unsafe { llama_batch_get_one(tokens.as_mut_ptr(), tokens.len() as i32) };
-                info!(batch_tokens = %batch.n_tokens);
 
                 // If model has encoder then encode first
                 if ctx.has_encoder {
@@ -746,7 +750,7 @@ pub async fn test_llama(
     let prompt = prompt.to_owned();
 
     // Loop
-    let lib_handle = tokio::spawn(async {
+    let lib_handle = tokio::task::spawn_blocking(|| {
         // init backend
         let _backend = llama::LlamaBackend::default();
 
@@ -755,6 +759,7 @@ pub async fn test_llama(
 
         model.run(rx)
     });
+
     // Client
     let (gen_tx, gen_rx) = mpsc::channel::<llama::LlamaGenerated>();
     let mut messages: Vec<llama::LlamaChatMessage> = Vec::new();
@@ -768,9 +773,7 @@ pub async fn test_llama(
     while let Ok(Ok(s)) = gen_rx.recv() {
         res += &s;
         n_recv += 1;
-        print!("{s}");
     }
-    println!();
     messages.push(llama::LlamaChatMessage {
         role: CString::new("assistant").unwrap(),
         content: CString::new(res).unwrap(),

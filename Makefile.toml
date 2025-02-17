@@ -17,8 +17,16 @@ dependencies = ["build_dependencies"]
 command = "git"
 args = ["submodule", "update", "--recursive"]
 
+# Fix some weird build issues with clang on MacOS
+[tasks.reinstall_xcode_cli]
+script = [
+	"sudo rm -rf /Library/Developer/CommandLineTools",
+	"sudo xcode-select --install",
+	"sudo xcodebuild -license",
+]
+
 [tasks.lint]
-dependencies = ["build_dependencies","lint_rust"]
+dependencies = ["build_dependencies", "lint_rust"]
 
 [tasks.lint_rust]
 command = "cargo"
@@ -28,21 +36,64 @@ dependencies = ["build_dependencies"]
 [tasks.cli_simple]
 env = { "RUST_LOG" = "info" }
 command = "cargo"
-args = ["run", "--bin", "cli", "--", "--hf-repo", "TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF", "--hf-file", "tinyllama-1.1b-chat-v1.0.Q2_K.gguf", "--ngl", "99", "-p", "Hello"]
+args = [
+	"run",
+	"--bin",
+	"cli",
+	"--",
+	"--hf-repo",
+	"TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF",
+	"--hf-file",
+	"tinyllama-1.1b-chat-v1.0.Q2_K.gguf",
+	"--ngl",
+	"99",
+	"-p",
+	"What is the meaning of life?",
+]
 dependencies = ["build_dependencies"]
 
 [tasks.llamacpp_simple]
 command = "llama-run"
-args = ["hf://TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/tinyllama-1.1b-chat-v1.0.Q2_K.gguf", "<<", "Hello"]
+args = [
+	"hf://TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/tinyllama-1.1b-chat-v1.0.Q2_K.gguf",
+	"<<",
+	"What is the meaning of life?",
+]
 
 [tasks.cli_deepseek]
 env = { "RUST_LOG" = "info" }
 command = "cargo"
-args = ["run", "--bin", "cli", "--", "--hf-repo", "ggml-org/DeepSeek-R1-Distill-Qwen-1.5B-Q4_0-GGUF", "--hf-file", "deepseek-r1-distill-qwen-1.5b-q4_0.gguf", "--ngl", "99", "-p", "Hello"]
+args = [
+	"run",
+	"--bin",
+	"cli",
+	"--",
+	"--hf-repo",
+	"ggml-org/DeepSeek-R1-Distill-Qwen-1.5B-Q4_0-GGUF",
+	"--hf-file",
+	"deepseek-r1-distill-qwen-1.5b-q4_0.gguf",
+	"--ngl",
+	"99",
+	"-p",
+	"What is the meaning of life?",
+]
 dependencies = ["build_dependencies"]
 
 [tasks.cli_code_suggestion]
 env = { "RUST_LOG" = "info" }
 command = "cargo"
-args = ["run", "--bin", "cli", "--", "--hf-repo", "ggml-org/Qwen2.5-Coder-0.5B-Q8_0-GGUF", "--hf-file", "qwen2.5-coder-0.5b-q8_0.gguf", "--ngl", "99", "-p", "Hello"]
+args = [
+	"run",
+	"--bin",
+	"cli",
+	"--",
+	"--hf-repo",
+	"TheBloke/stable-code-3b-GGUF",
+	"--hf-file",
+	"stable-code-3b.Q4_K_M.gguf",
+	"--ngl",
+	"99",
+	"-p",
+	"Generate Rust snippet for axum-based protobuf server",
+]
 dependencies = ["build_dependencies"]
