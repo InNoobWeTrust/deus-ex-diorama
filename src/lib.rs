@@ -42,29 +42,33 @@ pub async fn test_llama(
     });
 
     // Client
-    let (gen_tx, gen_rx) = mpsc::channel::<LlamaGenerated>();
-    let mut messages: Vec<LlamaChatMessage> = Vec::new();
-    messages.push(LlamaChatMessage {
-        role: CString::new("user").unwrap(),
-        content: CString::new(prompt.clone()).unwrap(),
-    });
-    let _ = tx.send((messages.clone(), gen_tx));
-    let mut res = "".to_string();
-    let mut n_recv = 0;
-    while let Ok(Ok(s)) = gen_rx.recv() {
-        res += &s;
-        n_recv += 1;
+    {
+        // Use IIFE to take ownership of tx so it will be dropped automatically after done sending
+        let tx = (move || tx)();
+        let (gen_tx, gen_rx) = mpsc::channel::<LlamaGenerated>();
+        let mut messages: Vec<LlamaChatMessage> = Vec::new();
+        messages.push(LlamaChatMessage {
+            role: CString::new("user").unwrap(),
+            content: CString::new(prompt.clone()).unwrap(),
+        });
+        let _ = tx.send((messages.clone(), gen_tx));
+        let mut res = "".to_string();
+        let mut n_recv = 0;
+        while let Ok(Ok(s)) = gen_rx.recv() {
+            res += &s;
+            n_recv += 1;
+        }
+        messages.push(LlamaChatMessage {
+            role: CString::new("assistant").unwrap(),
+            content: CString::new(res).unwrap(),
+        });
+
+        let fmt_msg = format!("{messages:?}");
+        info!(messages = %fmt_msg, %n_recv);
+
+        // Drop tx after done sending (no need if tx is moved to inner scope)
+        //drop(tx);
     }
-    messages.push(LlamaChatMessage {
-        role: CString::new("assistant").unwrap(),
-        content: CString::new(res).unwrap(),
-    });
-
-    let fmt_msg = format!("{messages:?}");
-    info!(messages = %fmt_msg, %n_recv);
-
-    // Drop tx after done sending
-    drop(tx);
 
     // Wait for tasks
     let _ = lib_handle.await;

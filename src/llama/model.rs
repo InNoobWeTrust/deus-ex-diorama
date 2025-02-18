@@ -64,7 +64,7 @@ impl LlamaModel {
         // Warm up context
         //ctx.warm_up(&vocab);
 
-        while let Ok((messages, gen_tx)) = rx.recv() {
+        'PROMPT: while let Ok((messages, gen_tx)) = rx.recv() {
             ctx.reset();
             smpl.reset();
 
@@ -113,22 +113,17 @@ impl LlamaModel {
                 n_pos: 0,
                 is_err: false,
             };
-            let mut is_err = false;
             let mut n_decode = 0;
             for chunk in chunks {
                 if chunk.is_err() {
                     let err = chunk.err().unwrap();
                     error!(err);
                     let _ = gen_tx.send(Err(err));
-                    is_err = true;
-                    break;
+                    continue 'PROMPT;
                 }
 
                 let _ = gen_tx.send(Ok(chunk.unwrap()));
                 n_decode += 1;
-            }
-            if is_err {
-                continue;
             }
             let elapsed = humantime::format_duration(t_start.elapsed());
             let speed = n_decode as f64 / t_start.elapsed().as_secs_f64();
