@@ -1,48 +1,45 @@
 use libllama_sys::*;
 
-//================================================== Redefine some defaults
-
+//======================================================= Redefine some defaults
 pub const LLAMA_TOKEN_NULL: llama_token = -1;
 
-unsafe extern "C" fn nolog_callback(
-    _level: ggml_log_level,
-    _text: *const ::std::os::raw::c_char,
-    _user_data: *mut ::std::os::raw::c_void,
-) {
-}
+//====================================================================== Logging
+mod log;
+pub use log::*;
 
-//================================================ Alias for generated chunk
+//==================================================== Alias for generated chunk
 mod generated;
 pub use generated::*;
 
-//===================================================== LlamaBackend wrapper
+//========================================================= LlamaBackend wrapper
 mod backend;
 pub use backend::*;
 
-//================================================== LlamaThreadpool wrapper
+//====================================================== LlamaThreadpool wrapper
 mod threadpool;
 pub use threadpool::*;
 
-//======================================================= LlamaModel wrapper
+//=========================================================== LlamaModel wrapper
 mod model;
 pub use model::*;
 
-//================================================ LlamaChatMessage wrrapper
+//==================================================== LlamaChatMessage wrrapper
 mod chat_message;
 pub use chat_message::*;
 
-//=============================================== LlamaChatTemplate wrrapper
+//=================================================== LlamaChatTemplate wrrapper
 mod chat_template;
 pub use chat_template::*;
 
-//====================================================== LlamaVocab wrrapper
+//========================================================== LlamaVocab wrrapper
 mod vocab;
+use tracing::{debug, error, info, warn};
 pub use vocab::*;
 
-//===================================================== LlamaContext wrapper
+//========================================================= LlamaContext wrapper
 mod context;
 pub use context::*;
 
-//===================================================== LlamaSampler wrapper
+//========================================================= LlamaSampler wrapper
 mod sampler;
 pub use sampler::*;

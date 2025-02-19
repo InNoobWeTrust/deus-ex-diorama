@@ -48,7 +48,7 @@ pub async fn test_llama(
         let (gen_tx, gen_rx) = mpsc::channel::<LlamaGenerated>();
         let mut messages: Vec<LlamaChatMessage> = Vec::new();
         messages.push(LlamaChatMessage {
-            role: CString::new("user").unwrap(),
+            role: c"user".into(),
             content: CString::new(prompt.clone()).unwrap(),
         });
         let _ = tx.send((messages.clone(), gen_tx));
@@ -59,7 +59,7 @@ pub async fn test_llama(
             n_recv += 1;
         }
         messages.push(LlamaChatMessage {
-            role: CString::new("assistant").unwrap(),
+            role: c"assistant".into(),
             content: CString::new(res).unwrap(),
         });
 
