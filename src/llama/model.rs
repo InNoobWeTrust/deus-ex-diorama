@@ -53,7 +53,7 @@ impl LlamaModel {
         let vocab = LlamaVocab::from(self);
         // Chat template to apply to messages
         let chat_template = LlamaChatTemplate::from(self);
-        let template_str = chat_template.get_chat_template().unwrap();
+        let template_str = chat_template.get_chat_template().unwrap_or("".to_string());
         info!(chat_template = %template_str);
 
         // Create context

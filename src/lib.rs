@@ -52,15 +52,28 @@ pub async fn test_llama(
             content: CString::new(prompt.clone()).unwrap(),
         });
         let _ = tx.send((messages.clone(), gen_tx));
-        let mut res = "".to_string();
+        let mut res = Vec::new();
         let mut n_recv = 0;
+        let buf_size = 32;
         while let Ok(Ok(s)) = gen_rx.recv() {
-            res += &s;
+            res.push(s);
             n_recv += 1;
+            if n_recv % buf_size == 0 {
+                let buf = res[(n_recv - buf_size)..n_recv].join("");
+                tokio::task::spawn(async move {
+                    info!(buffer = %buf);
+                });
+            }
+        }
+        {
+            let buf = res[(n_recv - n_recv % buf_size)..n_recv].join("");
+            tokio::task::spawn(async move {
+                info!(buffer = %buf);
+            });
         }
         messages.push(LlamaChatMessage {
             role: c"assistant".into(),
-            content: CString::new(res).unwrap(),
+            content: CString::new(res.join("")).unwrap(),
         });
 
         let fmt_msg = format!("{messages:?}");

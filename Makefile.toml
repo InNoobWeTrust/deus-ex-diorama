@@ -48,7 +48,7 @@ args = [
 	"--ngl",
 	"99",
 	"-p",
-	"What is the meaning of life?",
+	"What is the meaning of life? Please answer it short and concise.",
 ]
 dependencies = ["build_dependencies"]
 
@@ -57,7 +57,7 @@ command = "llama-run"
 args = [
 	"hf://TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/tinyllama-1.1b-chat-v1.0.Q2_K.gguf",
 	"<<",
-	"What is the meaning of life?",
+	"What is the meaning of life? Please answer it short and concise.",
 ]
 
 [tasks.cli_deepseek]
@@ -75,7 +75,7 @@ args = [
 	"--ngl",
 	"99",
 	"-p",
-	"What is the meaning of life?",
+	"What is the meaning of life? Please answer it short and concise.",
 ]
 dependencies = ["build_dependencies"]
 
@@ -94,6 +94,6 @@ args = [
 	"--ngl",
 	"99",
 	"-p",
-	"Generate Rust snippet for axum-based protobuf server",
+	"Generate Rust snippet for axum-based protobuf server, keep it short and simple.",
 ]
 dependencies = ["build_dependencies"]
